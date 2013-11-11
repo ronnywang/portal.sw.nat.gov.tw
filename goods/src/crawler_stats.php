@@ -26,7 +26,7 @@ class Crawler
 
     protected function addGoodID($id)
     {
-        $lens = array(2 => 0,4 => 2,6 => 4,8 => 6,11 => 8);
+        $lens = array(2 => 0,4 => 2,6 => 4,8 => 6,10 => 8);
         $len = strlen($id);
 
         $this->_id_used[$id] = true;
@@ -72,17 +72,14 @@ class Crawler
             'searchInfo.StartYear' => $year,
             'searchInfo.StartMonth' => $month,
             'searchInfo.EndMonth' => $month,
-            'searchInfo.goodsType' => strlen($ids[0]),
-            'searchInfo.goodsCodeGroup' => implode(',', $ids),
+            'searchInfo.goodsType' => strlen($ids[0]) < 10 ? strlen($ids[0]) : 11,
+            'earchInfo.goodsCodeGroup' => implode(',', $ids),
             'searchInfo.CountryName' => '請點選國家地區',
             'searchInfo.Type' => 'rbMoney1',
             'searchInfo.GroupType' => 'rbByGood',
             'Search' => '開始查詢',
         );
         $params['searchInfo.goodsCodeGroup'] = implode(',', $ids);
-        if (strlen($ids[0]) == 11) {
-            $params['searchInfo.goodsCodeGroup'] = implode(',', array_map(function($a){ return substr($a, 0, 10); }, $ids));
-        }
         $curl = curl_init($url);
         $fp = tmpfile();
         curl_setopt($curl, CURLOPT_RETURNTRANSFER, true);
@@ -102,7 +99,7 @@ class Crawler
             $rows = array();
             $td_doms = $tr_doms->item($i)->getElementsByTagName('td');
 
-            if (strlen($ids[0]) == 11) {
+            if (strlen($ids[0]) == 10) {
                 $rows[] = trim($td_doms->item(0)->nodeValue); // 貨品分類
                 //$rows[] = $td_doms->item(1)->nodeValue; // 中文貨名
                 //$rows[] = $td_doms->item(2)->nodeValue; // 英文貨名
@@ -140,6 +137,9 @@ class Crawler
 
     public function crawlFromFile($from, $to, $year, $month)
     {
+        if (file_exists(__DIR__. "/../{$year}-{$month}-{$to}.csv")){
+            return;
+        }
         $fp = fopen(__DIR__ . "/../{$year}-{$month}-{$from}.csv", 'r');
         $ids = array();
         while ($rows = fgetcsv($fp)) {
@@ -175,15 +175,17 @@ class Crawler
 
     public function crawlMonth($year, $month)
     {
-        // 兩碼
-        $this->_output = fopen(__DIR__ . "/../{$year}-{$month}-2code.csv", 'w');
-        $this->outputCSV(array('貨品分類', '國家', '重量', '重量單位', '價值'));
-        $good_ids = $this->getGoodIds();
-        if (!$ids = $good_ids['root']) {
-            return;
+        if (!file_exists(__DIR__ . "/../{$year}-{$month}-2code.csv")){
+            // 兩碼
+            $this->_output = fopen(__DIR__ . "/../{$year}-{$month}-2code.csv", 'w');
+            $this->outputCSV(array('貨品分類', '國家', '重量', '重量單位', '價值'));
+            $good_ids = $this->getGoodIds();
+            if (!$ids = $good_ids['root']) {
+                return;
+            }
+            $this->crawlIds($ids, $year, $month);
+            fclose($this->_output);
         }
-        $this->crawlIds($ids, $year, $month);
-        fclose($this->_output);
 
         $this->crawlFromFile('2code', '4code', $year, $month);
         $this->crawlFromFile('4code', '6code', $year, $month);
