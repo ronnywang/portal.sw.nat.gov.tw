@@ -123,9 +123,14 @@ class Crawler
         }
     }
 
-    public function main()
+    public function main($argv)
     {
-        for ($year = 102; $year >= 92; $year --) {
+        if ($argv[1]) {
+            $years = array_slice($argv, 1);
+        } else {
+            $years = range(102, 92);
+        }
+        foreach ($years as $year) {
             for ($month = 1; $month <= 12; $month ++) {
                 if ($year == 102 and $month > 8) {
                     continue;
