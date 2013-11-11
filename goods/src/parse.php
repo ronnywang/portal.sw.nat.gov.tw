@@ -10,7 +10,7 @@ $fp = fopen('php://temp', 'r+');
 fputs($fp, $ret);
 rewind($fp);
 
-$output = fopen('good_code.csv', 'w');
+$output = fopen(__DIR__ . '/../good_code.csv', 'w');
 fputcsv($output, array(
     '貨品號列（2~11碼）',
     '生效日期(YYYMMDD)',
