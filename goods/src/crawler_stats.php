@@ -3,6 +3,7 @@
 class Crawler
 {
     protected $_good_ids = null;
+    protected $_id_used = array();
     /**
      * getGoodIds 取得各種 ID 的 parent 關係
      * 
@@ -14,22 +15,35 @@ class Crawler
         if ($this->_good_ids) {
             return $this->_good_ids;
         }
+        $this->_good_ids = array();
         $fp = fopen(__DIR__ . '/../good_code.csv', 'r');
-        $good_ids = array();
-
-        $lens = array(2 => 0,4 => 2,6 => 4,8 => 6,11 => 8);
         while ($rows = fgetcsv($fp)) {
-            $len = strlen($rows[0]);
-            if (!array_key_exists($len, $lens)) {
-                continue;
-            }
-            $prefix = $lens[$len] ? substr($rows[0], 0, $lens[$len]) : 'root';
-            if (!array_key_exists($prefix, $good_ids)) {
-                $good_ids[$prefix] = array();
-            }
-            $good_ids[$prefix][] = $rows[0];
+            $this->addGoodID($rows[0]);
         }
-        return $this->_good_ids = $good_ids;
+
+        return $this->_good_ids;
+    }
+
+    protected function addGoodID($id)
+    {
+        $lens = array(2 => 0,4 => 2,6 => 4,8 => 6,11 => 8);
+        $len = strlen($id);
+
+        $this->_id_used[$id] = true;
+
+        if (!array_key_exists($len, $lens)) {
+            return;
+        }
+
+        $prefix = $lens[$len] ? substr($id, 0, $lens[$len]) : 'root';
+        if (!array_key_exists($prefix, $this->_good_ids)) {
+            $this->_good_ids[$prefix] = array();
+        }
+
+        $this->_good_ids[$prefix][] = $id;
+        if ($prefix != 'root' and !$this->_id_used[$prefix]) {
+            $this->addGoodID($prefix);
+        }
     }
 
     protected $_output = null;
@@ -70,21 +84,17 @@ class Crawler
             $params['searchInfo.goodsCodeGroup'] = implode(',', array_map(function($a){ return substr($a, 0, 10); }, $ids));
         }
         $curl = curl_init($url);
+        $fp = tmpfile();
         curl_setopt($curl, CURLOPT_RETURNTRANSFER, true);
         curl_setopt($curl, CURLOPT_USERAGENT, 'Chrome');
         curl_setopt($curl, CURLOPT_SSL_VERIFYPEER, false);
         curl_setopt($curl, CURLOPT_POSTFIELDS, $params);
-        $ret = curl_exec($curl);
-        if (!$ret) {
-            var_dump(curl_getinfo($curl));
-            throw new Exception('failed');
-            exit;
-        }
-
-        //$ret = file_get_contents('output.html');
+        curl_setopt($curl, CURLOPT_FILE, $fp);
+        curl_exec($curl);
+        curl_close($curl);
 
         $doc = new DOMDocument;
-        @$doc->loadHTML($ret);
+        @$doc->loadHTMLFile(stream_get_meta_data($fp)['uri']);
         $table_dom = $doc->getElementById('dataList');
         $tr_doms = $table_dom->getElementsByTagName('tr');
 
