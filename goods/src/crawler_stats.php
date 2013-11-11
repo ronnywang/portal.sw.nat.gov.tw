@@ -120,9 +120,6 @@ class Crawler
     {
         for ($year = 102; $year >= 92; $year --) {
             for ($month = 1; $month <= 12; $month ++) {
-                if ($year == 102 and $month == 1) {
-                    continue;
-                }
                 if ($year == 102 and $month > 8) {
                     continue;
                 }
