@@ -57,7 +57,7 @@ class Crawler
         fputcsv($this->_output, $rows);
     }
 
-    public function crawlIds($ids, $year, $month)
+    public function crawlIds($ids, $year, $month, $type_id)
     {
         $url = 'https://portal.sw.nat.gov.tw/APGA/GA03_LIST';
         error_log("crawling {$year}/{$month}" . implode(',', $ids));
@@ -67,7 +67,8 @@ class Crawler
             'maxMonth' => '8',
             'minMonth' => '1',
             'maxYearByYear' => '101',
-            'searchInfo.TypePort' => '1',
+            // 1-進口 4-出口
+            'searchInfo.TypePort' => $type_id,
             'searchInfo.TypeTime' => '0',
             'searchInfo.StartYear' => $year,
             'searchInfo.StartMonth' => $month,
@@ -125,34 +126,30 @@ class Crawler
 
     public function main($argv)
     {
-        if ($argv[1]) {
-            $years = array_slice($argv, 1);
-        } else {
-            $years = range(102, 92);
+        list(, $year, $month) = $argv;
+        if (!intval($year) or !intval($month)) {
+            die("請用 php crawler_stats.php {民國年} {月}\n");
         }
-        foreach ($years as $year) {
-            for ($month = 1; $month <= 12; $month ++) {
-                if ($year == 102 and $month > 8) {
-                    continue;
-                }
-                $this->crawlMonth($year, $month);
-            }
-        }
+
+        $this->crawlMonth($year, $month, __DIR__ . '/../good_in', 1);
+        $this->crawlMonth($year, $month, __DIR__ . '/../good_rein', 2);
+        $this->crawlMonth($year, $month, __DIR__ . '/../good_out', 4);
+        $this->crawlMonth($year, $month, __DIR__ . '/../good_reout', 5);
     }
 
-    public function crawlFromFile($from, $to, $year, $month)
+    public function crawlFromFile($from, $to, $year, $month, $target_dir, $type_id)
     {
-        if (file_exists(__DIR__. "/../{$year}-{$month}-{$to}.csv")){
+        if (file_exists($target_dir . "/{$year}-{$month}-{$to}.csv")){
             return;
         }
-        $fp = fopen(__DIR__ . "/../{$year}-{$month}-{$from}.csv", 'r');
+        $fp = fopen($target_dir . "/{$year}-{$month}-{$from}.csv", 'r');
         $ids = array();
         while ($rows = fgetcsv($fp)) {
             $ids[$rows[0]] = true;
         }
         $good_ids = $this->getGoodIds();
 
-        $this->_output = fopen(__DIR__ . "/../{$year}-{$month}-{$to}.csv", 'w');
+        $this->_output = fopen($target_dir . "/{$year}-{$month}-{$to}.csv", 'w');
         if ($to == '11code') {
             $this->outputCSV(array('貨品分類', '國家', '數量', '數量單位', '重量', '重量單位', '價值'));
         } else {
@@ -167,35 +164,35 @@ class Crawler
             $query_ids = array_merge($query_ids, $good_ids[$id]);
 
             if (count($query_ids) > 80) {
-                $this->crawlIds($query_ids, $year, $month);
+                $this->crawlIds($query_ids, $year, $month, $type_id);
                 $query_ids = array();
             }
         }
         if (count($query_ids)) {
-            $this->crawlIds($query_ids, $year, $month);
+            $this->crawlIds($query_ids, $year, $month, $type_id);
             $query_ids = array();
         }
         fclose($this->_output);
     }
 
-    public function crawlMonth($year, $month)
+    public function crawlMonth($year, $month, $target_dir, $type_id)
     {
-        if (!file_exists(__DIR__ . "/../{$year}-{$month}-2code.csv")){
+        if (!file_exists($target_dir . "/{$year}-{$month}-2code.csv")){
             // 兩碼
-            $this->_output = fopen(__DIR__ . "/../{$year}-{$month}-2code.csv", 'w');
+            $this->_output = fopen($target_dir . "/{$year}-{$month}-2code.csv", 'w');
             $this->outputCSV(array('貨品分類', '國家', '重量', '重量單位', '價值'));
             $good_ids = $this->getGoodIds();
             if (!$ids = $good_ids['root']) {
                 return;
             }
-            $this->crawlIds($ids, $year, $month);
+            $this->crawlIds($ids, $year, $month, $type_id);
             fclose($this->_output);
         }
 
-        $this->crawlFromFile('2code', '4code', $year, $month);
-        $this->crawlFromFile('4code', '6code', $year, $month);
-        $this->crawlFromFile('6code', '8code', $year, $month);
-        $this->crawlFromFile('8code', '11code', $year, $month);
+        $this->crawlFromFile('2code', '4code', $year, $month, $target_dir, $type_id);
+        $this->crawlFromFile('4code', '6code', $year, $month, $target_dir, $type_id);
+        $this->crawlFromFile('6code', '8code', $year, $month, $target_dir, $type_id);
+        $this->crawlFromFile('8code', '11code', $year, $month, $target_dir, $type_id);
 
     }
 }
